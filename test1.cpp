@@ -2,14 +2,28 @@
 /**g++ -o callpy callpy.cpp -I/usr/include/python2.6 -L/usr/lib64/python2.6/config -lpython2.6**/  
 // #include <python3.5m/Python.h>  
 #include<Python.h>
-int main(int argc, char** argv)  
-{  
+#include<iostream>
+#include<opencv2/opencv.hpp>
+#include<opencv2/highgui/highgui.hpp>
+#include<numpy/arrayobject.h>
+#include <pthread.h>
+// #include <thread>
+// #include</usr/local/lib/python3.5/dist-packages/numpy/core/include/numpy/arrayobject.h>
+//初始化 numpy 执行环境，主要是导入包，python2.7用void返回类型，python3.0以上用int返回类型
+using namespace std;
+int init_numpy()
+{
+    import_array();
+    
+}
+int main(int argc, char** argv){  
     // 初始化Python  
     //在使用Python系统前，必须使用Py_Initialize对其  
     //进行初始化。它会载入Python的内建模块并添加系统路  
     //径到模块搜索路径中。这个函数没有返回值，检查系统  
     //是否初始化成功需要使用Py_IsInitialized。  
-    Py_Initialize();  
+    Py_Initialize(); 
+    init_numpy(); 
   
     // 检查初始化是否成功  
     if ( !Py_IsInitialized() ) {  
@@ -22,12 +36,13 @@ int main(int argc, char** argv)
     PyRun_SimpleString("import sys");  
     // PyRun_SimpleString("print 1");  
     PyRun_SimpleString("print('---import sys---')");   
-    PyRun_SimpleString("sys.path.append('./')");  
+    PyRun_SimpleString("sys.path.append('./')"); 
+    cout<<"pyrun"<<endl; 
     PyObject *pName,*pModule,*pDict,*pFunc,*pArgs;  
   
     // 载入名为pytest的脚本  
-    //pName = PyString_FromString("pytest");  
-    pModule = PyImport_ImportModule("pytest");  
+    //pName = PyString_FromString("pytest1");  
+    pModule = PyImport_ImportModule("pytest1");  
     if ( !pModule ) {  
         printf("can't find pytest.py");  
         getchar();  
@@ -38,49 +53,51 @@ int main(int argc, char** argv)
         return -1;  
     }  
   
-    // 找出函数名为add的函数  
+    // 找出函数名为run的函数  
     printf("----------------------\n");  
-    pFunc = PyDict_GetItemString(pDict, "add");  
+    pFunc = PyDict_GetItemString(pDict, "run");  
     if ( !pFunc || !PyCallable_Check(pFunc) ) {  
-        printf("can't find function [add]");  
+        printf("can't find function [run]");  
         getchar();  
         return -1;  
-     }  
+    }
+    cv::Mat img = cv::imread("test.png");
+    if(img.empty())
+        return -1;
+    int x,y,z;
+    x = img.rows;
+    y = img.cols;
+    z = img.channels();
+    PyObject *ArgList = PyTuple_New(1);
+    unsigned char *CArrays = new unsigned char [x*y*z];
+    int iChannels = img.channels();
+    int iRows = img.rows;
+    int iCols = img.cols * iChannels; 
+    // unsigned char *data = (unsigned  char*)malloc(sizeof(unsigned char) * m * n);
+    uchar* p;
+    int id = -1;
+    // int i ,;
+    for (int i = 0;i<iRows;i++){
+        // 获取第i行的地址
+        p=img.ptr<uchar>(i);
+        for (int j=0;j<iCols;j++){
+            CArrays[++id]=p[j];
+        }
+    }
+    npy_intp Dims[3] = {y,x,z};
+    PyObject *PyArray = PyArray_SimpleNewFromData(3, Dims, NPY_UBYTE, CArrays);
+    // 将pylist对象放入pytuple对象中
+    PyTuple_SetItem(ArgList, 0, PyArray);
+    PyObject *pReturn = PyObject_CallObject(pFunc, ArgList);
+
+    Py_DECREF(pModule);
+    // 关闭Python
+    Py_Finalize(); 
+    return 0;
   
-    // 参数进栈  
-    *pArgs;  
-    pArgs = PyTuple_New(2);  
-  
-    //  PyObject* Py_BuildValue(char *format, ...)  
-    //  把C++的变量转换成一个Python对象。当需要从  
-    //  C++传递变量到Python时，就会使用这个函数。此函数  
-    //  有点类似C的printf，但格式不同。常用的格式有  
-    //  s 表示字符串，  
-    //  i 表示整型变量，  
-    //  f 表示浮点数，  
-    //  O 表示一个Python对象。  
-  
-    PyTuple_SetItem(pArgs, 0, Py_BuildValue("l",3));  
-    PyTuple_SetItem(pArgs, 1, Py_BuildValue("l",4));  
-  
-    // 调用Python函数  
-    PyObject_CallObject(pFunc, pArgs);  
-  
-    //下面这段是查找函数foo 并执行foo  
-    printf("----------------------\n");  
-    pFunc = PyDict_GetItemString(pDict, "foo");  
-    if ( !pFunc || !PyCallable_Check(pFunc) ) {  
-        printf("can't find function [foo]");  
-        getchar();  
-        return -1;  
-     }  
-  
-    pArgs = PyTuple_New(1);  
-    PyTuple_SetItem(pArgs, 0, Py_BuildValue("l",2));   
-  
-    PyObject_CallObject(pFunc, pArgs);  
-       
-    printf("----------------------\n");   
-    Py_Finalize();  
-    return 0;  
 }
+// int main(int argc, char** argv){
+//     test();
+//     pthread_t T;
+//     int ret = pthread_create(&T, NULL,NULL,NULL);    
+// }
